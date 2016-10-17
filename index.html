@@ -1,0 +1,42 @@
+<html>
+  <head>
+    <title>Outlook Calendar</title>
+    <script>
+      window.onload = function(){
+        var user,pass;
+
+        function submitFile(event) {
+          event.preventDefault();
+          var formData = new FormData();
+
+          formData.append('file', document.getElementById("file").files[0]);
+          console.log('submitFile', formData);
+
+          fetch('http://localhost:8000/postCalendarEvent', {
+            method: 'POST',
+            headers: {
+            'Accept': 'application/json, application/xml, text/plain, text/html, *.*',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'
+            },
+            body: formData
+          })
+          .then(res => {
+            console.log(res);
+          })
+          .catch(err => {
+            console.log(err);
+          });
+        }
+
+        document.getElementById('sendFile').addEventListener('submit', submitFile);
+      }
+    </script>
+  </head>
+  <body>
+    <h1>Creat Events</h1>
+    <form action="" id="sendFile">
+      <input type="file" id="file" size="40"><br><br>
+      <input type="submit" value="Submit">
+    </form>
+  </body>
+</html>
