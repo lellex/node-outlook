@@ -14,10 +14,7 @@
 
           fetch('http://localhost:8000/postCalendarEvent', {
             method: 'POST',
-            headers: {
-            'Accept': 'application/json, application/xml, text/plain, text/html, *.*',
-            'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'
-            },
+            credentials: 'same-origin',
             body: formData
           })
           .then(res => {

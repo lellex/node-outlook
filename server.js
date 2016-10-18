@@ -59,8 +59,6 @@ function tokenReceived(response, error, token) {
   }
 }
 
-app.use(bodyParser.urlencoded({ extended: false }));
-
 app.get('/', function(req, res){
   res.writeHead(200, {'Content-Type': 'text/html'});
   res.write('<p>Please <a href="' + authHelper.getAuthUrl() + '">sign in</a> with your Office 365 or Outlook.com account.</p>');
@@ -81,78 +79,103 @@ app.get('/creatCalendarEvent', function(request, response){
   response.sendfile('index.html');
 });
 
-app.post('/postCalendarEvent', function(request, response){
+var Busboy = require('busboy');
+var csv = require('csv-parser');
+
+app.post('/postCalendarEvent', function(req, res){
   console.log('postCalendarEvent');
-  console.log(request.body);
 
-  var token = getValueFromCookie('node-tutorial-token', request.headers.cookie);
-  console.log('Token found in cookie: ', token);
-  var email = getValueFromCookie('node-tutorial-email', request.headers.cookie);
-  console.log('Email found in cookie: ', email);
-
-  if (token) {
-    response.writeHead(200, {'Content-Type': 'text/html'});
-    fs.readFile(__dirname + '/index.html', function(err,data){
-      if(err) throw err;
-      response.write(data);
-    });
-
-    fs.readFile(__dirname + '/eventsTest.csv', function(err, data){
-      if(err) throw err;
-      var allEvent = data.toString().split(/\r?\n/);
-      for(var i = 0; i < allEvent.length; i++){
-        if(allEvent[i]){
-          var anEvent = allEvent[i].split(";");
-
-          var date = anEvent[1].toString().split(" - ");
-          var dateTimeStart = anEvent[0]+"T"+date[0].toString()+":00";
-          var dateTimeEnd = anEvent[0]+"T"+date[1].toString()+":00";
-
-          // Set the API endpoint to use the v2.0 endpoint
-          outlook.base.setApiEndpoint('https://outlook.office.com/api/v2.0');
-
-          var newEvent = {
-            'Subject': anEvent[3],
-            'Body': {
-              'ContentType': 'HTML',
-              'Content': anEvent[4],
-            },
-            'Start': {
-              'DateTime': dateTimeStart,
-              'TimeZone': 'Central European Standard Time'
-            },
-            'End': {
-              'DateTime': dateTimeEnd,
-              'TimeZone': 'Central European Standard Time'
-            },
-            'Attendees': [
-              {
-                'EmailAddress': {
-                  'Address': 'allieb@contoso.com',
-                  'Name': 'Allie Bellew'
-                },
-                'Type': 'Required'
-              }
-            ]
-          };
-          outlook.calendar.createEvent({token: token, event: newEvent},
-            function(error, result){
-              if (error) {
-                console.log('createEvent returned an error: ' + error);
-              }
-              else if (result) {
-                console.log(JSON.stringify(result, null, 2));
-              }
-            });
-          }
-        }
+  var busboy = new Busboy({ headers: req.headers });
+    busboy.on('file', function(fieldname, file, filename, encoding, mimetype) {
+      console.log('File [' + fieldname + ']: filename: ' + filename + ', encoding: ' + encoding + ', mimetype: ' + mimetype);
+      file.pipe(csv({
+        separator: ';', 
+        headers: ['Date', 'Créneau', 'Salle(s)', 'Type d\'activité', 'Cours', 'Description', 'Réservations']
+      }))
+      .on('data', function(data) {
+        console.log(data);
       });
-    }
-    else {
-      response.writeHead(200, {'Content-Type': 'text/html'});
-      response.write('<p> No token found in cookie!</p>');
-      response.end();
-    }
+      file.on('end', function() {
+        console.log('File [' + fieldname + '] Finished');
+      });
+    });
+    busboy.on('field', function(fieldname, val, fieldnameTruncated, valTruncated) {
+      console.log('Field [' + fieldname + ']: value: ' + inspect(val));
+    });
+    busboy.on('finish', function() {
+      console.log('Done parsing form!');
+      res.writeHead(303, { Connection: 'close', Location: '/' });
+      res.end();
+    });
+    req.pipe(busboy);
+  // var token = getValueFromCookie('node-tutorial-token', request.headers.cookie);
+  // console.log('Token found in cookie: ', token);
+  // var email = getValueFromCookie('node-tutorial-email', request.headers.cookie);
+  // console.log('Email found in cookie: ', email);
+  //
+  // if (token) {
+  //   response.writeHead(200, {'Content-Type': 'text/html'});
+  //   fs.readFile(__dirname + '/index.html', function(err,data){
+  //     if(err) throw err;
+  //     response.write(data);
+  //   });
+  //
+  //   fs.readFile(__dirname + '/eventsTest.csv', function(err, data){
+  //     if(err) throw err;
+  //     var allEvent = data.toString().split(/\r?\n/);
+  //     for(var i = 0; i < allEvent.length; i++){
+  //       if(allEvent[i]){
+  //         var anEvent = allEvent[i].split(";");
+  //
+  //         var date = anEvent[1].toString().split(" - ");
+  //         var dateTimeStart = anEvent[0]+"T"+date[0].toString()+":00";
+  //         var dateTimeEnd = anEvent[0]+"T"+date[1].toString()+":00";
+  //
+  //         // Set the API endpoint to use the v2.0 endpoint
+  //         outlook.base.setApiEndpoint('https://outlook.office.com/api/v2.0');
+  //
+  //         var newEvent = {
+  //           'Subject': anEvent[3],
+  //           'Body': {
+  //             'ContentType': 'HTML',
+  //             'Content': anEvent[4],
+  //           },
+  //           'Start': {
+  //             'DateTime': dateTimeStart,
+  //             'TimeZone': 'Central European Standard Time'
+  //           },
+  //           'End': {
+  //             'DateTime': dateTimeEnd,
+  //             'TimeZone': 'Central European Standard Time'
+  //           },
+  //           'Attendees': [
+  //             {
+  //               'EmailAddress': {
+  //                 'Address': 'allieb@contoso.com',
+  //                 'Name': 'Allie Bellew'
+  //               },
+  //               'Type': 'Required'
+  //             }
+  //           ]
+  //         };
+  //         outlook.calendar.createEvent({token: token, event: newEvent},
+  //           function(error, result){
+  //             if (error) {
+  //               console.log('createEvent returned an error: ' + error);
+  //             }
+  //             else if (result) {
+  //               console.log(JSON.stringify(result, null, 2));
+  //             }
+  //           });
+  //         }
+  //       }
+  //     });
+  //   }
+  //   else {
+  //     response.writeHead(200, {'Content-Type': 'text/html'});
+  //     response.write('<p> No token found in cookie!</p>');
+  //     response.end();
+  //   }
   });
 
 
